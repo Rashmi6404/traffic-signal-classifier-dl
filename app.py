@@ -6,10 +6,15 @@ from PIL import Image
 st.set_page_config(page_title="Traffic Sign Classifier")
 
 @st.cache_resource
-def load_model():
-    return tf.keras.models.load_model("traffic_sign_model_fixed.h5")
+def load_tflite_model():
+    interpreter = tf.lite.Interpreter(model_path="traffic_sign_model.tflite")
+    interpreter.allocate_tensors()
+    return interpreter
 
-model = load_model()
+interpreter = load_tflite_model()
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+
 
 IMG_HEIGHT = 224
 IMG_WIDTH = 224
@@ -35,10 +40,15 @@ if uploaded_file is not None:
     st.image(img, caption="Uploaded Image", use_column_width=True)
 
     img_array = np.expand_dims(np.array(img), axis=0)
-    preds = model.predict(img_array)
+    img_array = (img_array / 127.5) - 1.0
+    interpreter.set_tensor(input_details[0]['index'], img_array)
+    interpreter.invoke()
+    preds = interpreter.get_tensor(output_details[0]['index'])
+
 
     idx = np.argmax(preds)
     confidence = preds[0][idx] * 100
 
     st.success(f"Prediction: {index_to_name.get(idx, 'Unknown')}")
     st.write(f"Confidence: {confidence:.2f}%")
+
